@@ -78,7 +78,17 @@ function LEGEND_SolidStateDetector(::Type{T}, meta::PropDict) where {T}
 
         # bot outer taper
         bot_outer_taper_height = to_SSD_units(T, meta.geometry.taper.bottom.outer.height_in_mm, u"mm")
-        bot_outer_taper_angle = to_SSD_units(T, meta.geometry.taper.bottom.outer.angle_in_deg, u"°") # now in radiance
+        try
+            bot_outer_taper_angle = to_SSD_units(T, meta.geometry.taper.bottom.outer.angle_in_deg, u"°") # now in radiance
+        catch
+            bot_outer_taper_radius = meta.geometry.taper.bottom.outer.radius_in_mm # some detectors have radius defined instead of angle
+            if bot_outer_taper_radius == 0
+                bot_outer_taper_angle = to_SSD_units(T, 0, u"°")
+            else
+                bot_outer_taper_angle = to_SSD_units(T,atan(bot_outer_taper_radius/bot_outer_taper_height), u"°")
+            end
+        end
+
         has_bot_outer_taper = bot_outer_taper_height > 0 && bot_outer_taper_angle > 0
         if has_bot_outer_taper
             r_center = crystal_radius - bot_outer_taper_height * tan(bot_outer_taper_angle) / 2
@@ -185,6 +195,7 @@ function LEGEND_SolidStateDetector(::Type{T}, meta::PropDict) where {T}
                     origin = CartesianPoint{T}(0, 0, crystal_height - top_inner_taper_height - hZ)
                 )
             elseif has_borehole
+                Δr_li_thickness = li_thickness #abi added
                 hZ = borehole_height / 2
                 r = ((borehole_radius, borehole_radius+Δr_li_thickness),(borehole_radius, borehole_radius+Δr_li_thickness))
                 mc_geometry += CSG.Cone{T, CSG.ClosedPrimitive, typeof(r), Nothing}(; 
